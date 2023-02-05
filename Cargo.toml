@@ -7,3 +7,5 @@ edition = "2021"
 
 [dependencies]
 crossterm = "0.26.0"
+colors-transform = "0.2.11"
+clap = "4.1.4"

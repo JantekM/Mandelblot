@@ -2,17 +2,22 @@
 
 use crossterm::{
     cursor, execute, queue,
-    style::{self, Stylize},
+    style::{self, Stylize, Color},
     terminal::{enable_raw_mode, size, Clear, ClearType, ScrollUp, SetSize},
     Result,
 };
 use std::{
     io::{stdout, Write, stdin, Read},
-    path::Iter,
+    path::Iter, ops::{Add, Mul},
 };
+use colors_transform::{Hsl, Color as ctColor};
 
-const PIECE_SIZE: usize = 32;
-const MAX_ITERS: u8 = 64;
+use clap::{arg, command, value_parser, ArgAction, Command};
+
+const PIECE_SIZE: usize = 128 ;
+const MAX_ITERS: u64 = 30;
+
+
 
 #[derive(Copy, Clone)]
 enum IterResult {
@@ -32,6 +37,15 @@ struct ScreenPiece {
 }
 
 impl ScreenPiece {
+    fn new(x: f64, y: f64, size: f64)->ScreenPiece{
+        let piece = ScreenPiece{
+            iter_result: None,
+            pos_x: x,
+            pos_y: y,
+            edge_size: size,
+        };
+        return piece;
+    }
     fn populate(&mut self) {
         let mut iter_result = [IterResult::Uncalculated; PIECE_SIZE * PIECE_SIZE];
         let step: f64 = self.edge_size / PIECE_SIZE as f64;
@@ -81,14 +95,14 @@ fn print_screen(piece: &ScreenPiece) -> Result<()> {
                     queue!(
                         stdout(),
                         cursor::MoveTo(i as u16, j as u16),
-                        style::PrintStyledContent("█".magenta())
+                        style::PrintStyledContent("█".with(choose_color(num_iterations, rest)))
                     )?;
                 },
                 IterResult::MaxExceeded => {
                    queue!(
-                        stdout(),
+                        stdout(), 
                         cursor::MoveTo(i as u16, j as u16),
-                        style::PrintStyledContent("█".grey())
+                        style::PrintStyledContent("█".black())
                     )?; 
                 },
                 IterResult::Uncalculated => panic!("Tried to print uncalculated values")
@@ -101,20 +115,31 @@ fn print_screen(piece: &ScreenPiece) -> Result<()> {
     Ok(())
 }
 
+fn choose_color(iters: u64, rest: f64) -> Color{
+    let hue = (iters as f32 / MAX_ITERS as f32)*359.0;
+    let _light: f64 = if iters == MAX_ITERS.into() {
+        0.10
+    } else { (rest - 4.0)
+                    .log(10.0)
+                    .min(0.5)
+                    .add(0.5)
+                    .mul(100.0)
+    };
+    let color = Hsl::from(hue.floor(), 100.0, 50.0);
+    Color::Rgb { r: color.get_red().mul(255.0) as u8, 
+        g: color.get_green().mul(255.0) as u8, 
+        b: color.get_blue().mul(255.0) as u8 }
+}
+
 fn main() -> Result<()> {
 
-    //let res = calculate(-1.4, 0.05);
+    
 
-    let mut piece = ScreenPiece{
-        iter_result: None,
-        pos_x: -2.,
-        pos_y: -1.5,
-        edge_size: 3.0,
-    };
+    let mut piece = ScreenPiece::new(-1.5, -1.2, 2.5);
     piece.populate();
 
 
-    let (cols, rows) = size()?;
+    let (_cols, _rows) = size()?;
     //Clear(ClearType::All);
     execute!(stdout(), SetSize(PIECE_SIZE as u16, PIECE_SIZE as u16))?;
     Clear(ClearType::All);
@@ -124,6 +149,6 @@ fn main() -> Result<()> {
     //execute!(stdout(), SetSize(cols, rows))?;
 
     // execute!(stdout(), SetSize(cols, rows))?;
-    stdin().read(&mut [0]).unwrap();
+    //stdin().read(&mut [0]).unwrap();
     Ok(())
 }
